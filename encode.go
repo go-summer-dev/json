@@ -15,7 +15,7 @@ import (
 	"encoding"
 	"encoding/base64"
 	"fmt"
-	"github.com/go-summer-dev/json/defaultcase"
+	"github.com/go-summer-dev/defaultcase"
 	"math"
 	"reflect"
 	"sort"
