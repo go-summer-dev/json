@@ -1,0 +1,4 @@
+github.com/go-summer-dev/defaultcase v0.0.0-20230415151735-52562d98e2e5 h1:2Xr17qa4QKxHXGHDtLaM3hXA1WpQ/nGkL0vkqe8V6hQ=
+github.com/go-summer-dev/defaultcase v0.0.0-20230415151735-52562d98e2e5/go.mod h1:VSjyiBclhWIE2Izl6RRsDnJDZA6XK0SPFDrycnarRLU=
+github.com/iancoleman/strcase v0.2.0 h1:05I4QRnGpI0m37iZQRuskXh+w77mr6Z41lwQzuHLwW0=
+github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
