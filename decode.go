@@ -11,6 +11,7 @@ import (
 	"encoding"
 	"encoding/base64"
 	"fmt"
+	"github.com/go-summer-dev/marshaling"
 	"reflect"
 	"strconv"
 	"strings"
@@ -476,6 +477,9 @@ func indirect(v reflect.Value, decodingNull bool) (Unmarshaler, encoding.TextUnm
 			v.Set(reflect.New(v.Type().Elem()))
 		}
 		if v.Type().NumMethod() > 0 && v.CanInterface() {
+			if u, ok := v.Interface().(marshaling.Unmarshaler); ok {
+				return &gounmarshaler{u}, nil, reflect.Value{}
+			}
 			if u, ok := v.Interface().(Unmarshaler); ok {
 				return u, nil, reflect.Value{}
 			}

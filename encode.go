@@ -16,6 +16,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/go-summer-dev/defaultcase"
+	"github.com/go-summer-dev/marshaling"
 	"math"
 	"reflect"
 	"sort"
@@ -409,6 +410,8 @@ func typeEncoder(t reflect.Type) encoderFunc {
 var (
 	marshalerType     = reflect.TypeOf((*Marshaler)(nil)).Elem()
 	textMarshalerType = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+	// todo  go-summer-dev
+	goMarshalerType = marshaling.MarshalerType()
 )
 
 // newTypeEncoder constructs an encoderFunc for a type.
@@ -418,8 +421,15 @@ func newTypeEncoder(t reflect.Type, allowAddr bool) encoderFunc {
 	// Marshaler with a value receiver, then we're better off taking
 	// the address of the value - otherwise we end up with an
 	// allocation as we cast the value to an interface.
-	if t.Kind() != reflect.Pointer && allowAddr && reflect.PointerTo(t).Implements(marshalerType) {
-		return newCondAddrEncoder(addrMarshalerEncoder, newTypeEncoder(t, false))
+	if t.Kind() != reflect.Pointer && allowAddr {
+		pointer := reflect.PointerTo(t)
+		if pointer.Implements(goMarshalerType) || pointer.Implements(marshalerType) {
+			return newCondAddrEncoder(addrMarshalerEncoder, newTypeEncoder(t, false))
+		}
+	}
+	if t.Implements(goMarshalerType) {
+		// todo  go-summer-dev
+		return goMarshalerEncoder
 	}
 	if t.Implements(marshalerType) {
 		return marshalerEncoder
@@ -484,6 +494,25 @@ func marshalerEncoder(e *encodeState, v reflect.Value, opts encOpts) {
 		e.error(&MarshalerError{v.Type(), err, "MarshalJSON"})
 	}
 }
+func goMarshalerEncoder(e *encodeState, v reflect.Value, opts encOpts) {
+	if v.Kind() == reflect.Pointer && v.IsNil() {
+		e.WriteString("null")
+		return
+	}
+	m, ok := v.Interface().(marshaling.Marshaler)
+	if !ok {
+		e.WriteString("null")
+		return
+	}
+	b, err := m.GoMarshal()
+	if err == nil {
+		// copy JSON into buffer, checking validity.
+		err = compact(&e.Buffer, b, opts.escapeHTML)
+	}
+	if err != nil {
+		e.error(&MarshalerError{v.Type(), err, "GoMarshal"})
+	}
+}
 
 func addrMarshalerEncoder(e *encodeState, v reflect.Value, opts encOpts) {
 	va := v.Addr()
@@ -491,14 +520,27 @@ func addrMarshalerEncoder(e *encodeState, v reflect.Value, opts encOpts) {
 		e.WriteString("null")
 		return
 	}
-	m := va.Interface().(Marshaler)
-	b, err := m.MarshalJSON()
+	var (
+		b          []byte
+		err        error
+		sourceFunc string
+	)
+	{
+		if goMar, ok := va.Interface().(marshaling.Marshaler); ok {
+			b, err = goMar.GoMarshal()
+			sourceFunc = "GoMarshal"
+		} else {
+			m := va.Interface().(Marshaler)
+			b, err = m.MarshalJSON()
+			sourceFunc = "MarshalJSON"
+		}
+	}
 	if err == nil {
 		// copy JSON into buffer, checking validity.
 		err = compact(&e.Buffer, b, opts.escapeHTML)
 	}
 	if err != nil {
-		e.error(&MarshalerError{v.Type(), err, "MarshalJSON"})
+		e.error(&MarshalerError{v.Type(), err, sourceFunc})
 	}
 }
 
@@ -893,7 +935,8 @@ func newSliceEncoder(t reflect.Type) encoderFunc {
 	// Byte slices get special treatment; arrays don't.
 	if t.Elem().Kind() == reflect.Uint8 {
 		p := reflect.PointerTo(t.Elem())
-		if !p.Implements(marshalerType) && !p.Implements(textMarshalerType) {
+		if !p.Implements(goMarshalerType) && !p.Implements(marshalerType) &&
+			!p.Implements(textMarshalerType) {
 			return encodeByteSlice
 		}
 	}
